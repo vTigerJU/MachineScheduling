@@ -5,6 +5,7 @@ import copy
 import helper
 
 def calculate_makespan(machine_ix, jobs, duration, setup, release):
+    """Calculate makespan in one machine"""
     time = 0
     prev_job = None
     for idx, job in enumerate(jobs):
@@ -22,6 +23,7 @@ def calculate_makespan(machine_ix, jobs, duration, setup, release):
     return time
 
 def calculate_all_makespan(solution, duration, setup,release):
+    """Return makespan for all machines"""
     machine_times = []
     for machine, jobs in enumerate(solution):
         current_time = calculate_makespan(machine,jobs,duration,setup,release)
@@ -29,23 +31,20 @@ def calculate_all_makespan(solution, duration, setup,release):
 
     return machine_times
 
-#Provided makespan
 def makespan(solution, duration, setup,release):
-    makespan = 0
-    for machine, jobs in enumerate(solution):
-        current_time = calculate_makespan(machine,jobs,duration,setup,release)
-        makespan = max(makespan, current_time)
-    return makespan
+    """Find max makespan"""
+    return max(calculate_all_makespan(solution, duration, setup,release))
 
 def insert_missing(child,assigned,parent,n_machines, capable,duration, setup, release):
     """Local search insertion of missing jobs to repair new solutions"""
     for m in range(n_machines):
+        #Assigns from same machine in parent as in child
         for job in parent[m]:                
             if job not in assigned:
-                #Find best position in machine
                 best_pos = 0
                 min_increase = float("inf")
 
+                #Find best position in machine
                 for ix in range(len(child[m]) + 1):
                     new_machine = child[m][:]
                     new_machine.insert(ix,job)
@@ -64,19 +63,20 @@ def crossover(a,b, n_machines,capable,duration, setup, release):
     assigned_2 = set()
 
     for m, jobs in enumerate(a):
-        #Copy jobs from parent a according to crossover point
+        #If no jobs in machine
         if not jobs:
            continue
-        
+
+        #Copy jobs from parent A according to crossover point
         crossover_point = random.randint(0,len(jobs)-1)
         left = jobs[:crossover_point]
         child1[m].extend(left)
         assigned_1.update(left)
-
+        #Jobs right of crossover point
         right = jobs[crossover_point:]
         child2[m].extend(right)
         assigned_2.update(right)
-
+    #Insert missing jobs from parent B
     insert_missing(child1, assigned_1, b, n_machines, capable,duration, setup, release)
     insert_missing(child2, assigned_2, b, n_machines, capable,duration, setup, release)
     return (child1, child2)
@@ -95,6 +95,7 @@ def fisher_yates_shuffle(jobs):
     return jobs
 
 def initialization(n_jobs,n_machines, pop_size, capable, duration, setup, release):
+    """Greedy initialization of population"""
     population = []
     while len(population) != pop_size:
         #Create random order in jobs
@@ -103,6 +104,7 @@ def initialization(n_jobs,n_machines, pop_size, capable, duration, setup, releas
         solution = [[] for _ in range(n_machines)]
         machine_times = [0] *n_machines
 
+        #Assing every job
         for j in jobs:
             eligible_machines = capable[j]
             best_machine = -1
@@ -110,9 +112,9 @@ def initialization(n_jobs,n_machines, pop_size, capable, duration, setup, releas
             #Greedy assignment of jobs
             for m in eligible_machines:
                 #For every eligible machine find min makespan
-                prev_job = solution[m][-1] if solution[m] else None
-                s_time = setup[prev_job][j][m] if prev_job is not None else 0
-                release_time = max(machine_times[m] + s_time,release[j][m])
+                prev_job = solution[m][-1] if solution[m] else None #If previous job exists
+                s_time = setup[prev_job][j][m] if prev_job is not None else 0 #Get setup time
+                release_time = max(machine_times[m] + s_time,release[j][m]) #find max between time and release
                 current_time = release_time + duration[j][m] 
 
                 if current_time < best_time:
@@ -135,15 +137,14 @@ def insertion_neighborhood(sol, ins, n_machines, capable, duration, setup, relea
     n_sub = int(n_machines * ins)
     makespans = calculate_all_makespan(sol, duration, setup,release)
     sorted_makespans = sorted(range(n_machines), key=lambda i: makespans[i], reverse=True)
-    
+    best_makespan = max(makespans)
     #Try insertion in every machine til fraction of length
     for i in range(n_sub):
-        best_a = float("inf")
+        best_a = float("-inf")
         best_move = None
         machine_i = sorted_makespans[i]
         jobs = sol[machine_i]
         makespan_i = makespans[machine_i]
-
         #For each job in current machine
         for ix, job in enumerate(jobs):
             #Look at machines with lower makespan
@@ -162,16 +163,24 @@ def insertion_neighborhood(sol, ins, n_machines, capable, duration, setup, relea
                     temp_j.insert(ix_j,job)
                     new_makespan_i = calculate_makespan(machine_i,temp_i,duration, setup, release)
                     new_makespan_j = calculate_makespan(machine_j,temp_j,duration, setup, release)
-                    current_a = max(new_makespan_i,new_makespan_j)
-                    if current_a < best_a and current_a <= min_max:
-                        best_a = current_a
+                    new_max = max(new_makespan_i,new_makespan_j)
+                    #Check for improvment i.e. makespan i is lower and makespan j doesnt increase signficantly
+                    a = (makespan_i - new_makespan_i)+(makespan_j - new_makespan_j)
+                    if a > best_a and new_max <= min_max:
+                        best_a = a
                         best_move = (ix,machine_j,ix_j)
+
         if best_move:
             current_ix, target_machine, target_ix = best_move
             moving_job = sol[machine_i].pop(current_ix)
             sol[target_machine].insert(target_ix,moving_job)
-            #Possibly search machine again
-            return True
+            #Possibly search machine again if better solution is found
+    #print(best_makespan)
+    m = makespan(sol, duration, setup,release)
+    #print(m)
+    if best_makespan > m:
+        return True
+    else:
         return False
         
 
@@ -179,6 +188,7 @@ def nearest_neighbor():
     pass
 
 def is_unique(ind, pop):
+    """Check if individual is in population already"""
     for member in pop:
         if ind == member:
             return False
@@ -186,6 +196,7 @@ def is_unique(ind, pop):
 
 def hybrid_GA(instance, max_gen, pop_size, patience, ins):
     """Solution representation P individuals, M arrays of jobs"""
+    #Load instance variables
     n_jobs = instance["n"]
     n_machines = instance["m"]
     horizon = instance["horizon"]
@@ -200,27 +211,35 @@ def hybrid_GA(instance, max_gen, pop_size, patience, ins):
 
     for i in range(max_gen):
         print("Generation", i)
+        #Select parent indicies
         p1_ix, p2_ix = selection(pop_size)
+        #Do crossover to create 2 children
         children = crossover(pop[p1_ix], pop[p2_ix], n_machines, capable,duration, setup, release)
         improved_this_gen = False
+        #For every child do local search operators
         for child in children:
             improving = True
+            #As long as better solutions are found
             while improving:
                 #Only improvments on the busiest machine improve the makespan
                 #Attempting to move a job from a machine with an early completion to a busier machine is unlikely to decrease the makespan
                 improving = insertion_neighborhood(child, ins, n_machines, capable, duration, setup, release)
                 #nearest_neighbor()
                 #swap_neighborhood()
+            #Check that child is unique solution
             if is_unique(child, pop):
                 child_makespan = makespan(child,duration,setup,release)
                 worst_ind = makespan(pop[-1],duration,setup,release)
+                #Check if its better then current worst individual
                 if child_makespan < worst_ind:
                     pop[-1] = child
+                    #re sort population
                     pop.sort(key=lambda i: makespan(i,duration,setup,release))
                     improved_this_gen = True
 
         history.append(makespan(pop[0],duration,setup,release))
-
+        
+        #Stop if population stagnates
         if improved_this_gen:
             iterations_without_improvment = 0
         else:
