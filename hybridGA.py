@@ -368,7 +368,7 @@ for job in capable:
     for i in job:
         hist[i] += 1
 print(hist)
-#print_instance(test_inst)
+
 pop_size = 15
 nn = 0.8
 ins = 1
