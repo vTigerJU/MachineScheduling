@@ -190,11 +190,15 @@ def propose_swap_between_machines(state: ScheduleState, rng: random.Random) -> O
         return src, seq_a, dst, seq_b
     return None
 
-def intensify_best(state: ScheduleState, rng: random.Random, rounds: int = 200) -> ScheduleState:
+
+def intensify_best(state: ScheduleState, rng: random.Random, rounds: int = 1000) -> ScheduleState:
     best = state.clone()
+    move_fns = [propose_move, propose_swap_same_machine, propose_swap_between_machines]
+    weights = [0.75, 0.15, 0.10]
 
     for _ in range(rounds):
-        proposal = propose_move(best, rng)
+        move_fn = rng.choices(move_fns, weights=weights, k=1)[0]
+        proposal = move_fn(best, rng)
         if proposal is None:
             continue
 
@@ -246,7 +250,7 @@ def simulated_annealing(
     iterations = 0
 
     moves = [propose_move, propose_swap_same_machine, propose_swap_between_machines]
-    move_weights = [0.55, 0.25, 0.20]
+    move_weights = [0.75, 0.15, 0.10]
 
     while time.time() - start < time_limit:
         iterations += 1
@@ -299,7 +303,7 @@ def simulated_annealing(
             last_improvement = time.time()
 
 
-    best = intensify_best(best, rng, rounds=400)
+    best = intensify_best(best, rng, rounds=1500)
     return best
 
 
