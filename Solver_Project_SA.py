@@ -8,7 +8,8 @@ import time
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple
 
-
+# problem instance
+# This class stores the full scheduling instance from the json input
 @dataclass
 class Instance:
     n: int
@@ -71,6 +72,7 @@ class ScheduleState:
 def load_instance(path: str) -> Instance:
     return Instance.from_json(path)
 
+# Build a feasible starting solution for simulated annealing
 
 def greedy_initial_solution(inst: Instance, seed: int = 0) -> ScheduleState:
     rng = random.Random(seed)
@@ -105,7 +107,7 @@ def greedy_initial_solution(inst: Instance, seed: int = 0) -> ScheduleState:
         state.apply_machine_update(best_machine, best_seq)
     return state
 
-
+# Choose a job from a critical machine
 def random_job_on_critical_machine(state: ScheduleState, rng: random.Random) -> Tuple[int, int, int]:
     critical_machines = [k for k, c in enumerate(state.machine_completion) if c == state.makespan and state.machines[k]]
     k = rng.choice(critical_machines)
@@ -121,6 +123,7 @@ def random_job_on_critical_machine(state: ScheduleState, rng: random.Random) -> 
 
     return k, pos, seq[pos]
 
+# Move one job from a critical machine to another feasible machine/position (Neighborhood 1)
 
 def propose_move(state: ScheduleState, rng: random.Random) -> Optional[Tuple[int, List[int], int, List[int]]]:
     """Move one job from a critical machine to a possibly different feasible machine."""
@@ -162,7 +165,7 @@ def propose_move(state: ScheduleState, rng: random.Random) -> Optional[Tuple[int
     _, src, new_src_seq, dst, new_dst_seq = best
     return src, new_src_seq, dst, new_dst_seq
 
-
+# swap two jobs on the same machine (Neighborhood 2)
 def propose_swap_same_machine(state: ScheduleState, rng: random.Random) -> Optional[Tuple[int, List[int], int, List[int]]]:
     nontrivial = [k for k, seq in enumerate(state.machines) if len(seq) >= 2]
     if not nontrivial:
@@ -174,7 +177,7 @@ def propose_swap_same_machine(state: ScheduleState, rng: random.Random) -> Optio
     seq[i], seq[j] = seq[j], seq[i]
     return machine, seq, machine, seq
 
-
+# Exchange one job on a critical machine with one job on another machine (Neighborhood 3)
 def propose_swap_between_machines(state: ScheduleState, rng: random.Random) -> Optional[Tuple[int, List[int], int, List[int]]]:
     src, pos_a, job_a = random_job_on_critical_machine(state, rng)
     other_machines = [k for k, seq in enumerate(state.machines) if seq and k != src]
@@ -306,7 +309,8 @@ def simulated_annealing(
     best = intensify_best(best, rng, rounds=1500)
     return best
 
-
+# Run SA multiple times with different seeds.
+# keep the best solution across all runs.
 def multi_start_sa(inst: Instance, restarts: int, time_limit: float, seed: int) -> ScheduleState:
     per_restart = max(1.0, time_limit / max(1, restarts))
     best_state = None
@@ -317,6 +321,7 @@ def multi_start_sa(inst: Instance, restarts: int, time_limit: float, seed: int) 
     assert best_state is not None
     return best_state
 
+# Save Solution
 
 def save_solution(state: ScheduleState, path: str) -> None:
     with open(path, "w", encoding="utf-8") as f:
