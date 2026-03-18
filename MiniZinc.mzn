@@ -10,6 +10,7 @@ set of int: MACH = 1..m;
 array[JOB] of set of MACH: capable;
 array[JOB, MACH] of int: duration;
 array[JOB, MACH] of int: release;
+array[JOB, JOB, MACH] of int: setup;
 
 array[JOB] of var MACH: mach;
 array[JOB] of var 0..horizon: start;
@@ -39,8 +40,8 @@ constraint
   forall(i, j in JOB where i < j) (
     (mach[i] = mach[j]) ->
     (
-      finish[i] <= start[j] \/
-      finish[j] <= start[i]
+      start[j] >= finish[i] + setup[i,j,mach[i]] \/
+      start[i] >= finish[j] + setup[j,i,mach[i]]
     )
   );
 
@@ -73,12 +74,7 @@ constraint
     )
   );
 
-solve
-:: seq_search([
-     int_search([mach[j] | j in JOB], first_fail, indomain_min, complete),
-     int_search([start[j] | j in JOB], smallest, indomain_min, complete)
-   ])
-minimize makespan;
+solve minimize makespan;
 
 output [
   "{\n",
