@@ -66,6 +66,7 @@ constraint
     sum(j in JOB)(bool2int(mach[j] = k) * duration[j,k]) <= makespan
   );
 
+% If job j is assigned to machine k, it must start early enough to finish by the makespan
 constraint
   forall(j in JOB, k in MACH) (
     (mach[j] = k) ->
